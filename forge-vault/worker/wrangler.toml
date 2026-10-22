@@ -1,0 +1,39 @@
+name = "forge-vault"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+# The dashboard UI. run_worker_first keeps every page behind the vault login.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+[vars]
+# Max assets per ZIP download, to stay inside per-request subrequest limits.
+ZIP_LIMIT = "300"
+
+[[r2_buckets]]
+binding = "VAULT"
+bucket_name = "forge-vault"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "forge-vault"
+# Replace with the id printed by: npx wrangler d1 create forge-vault
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[queues.producers]]
+binding = "INGEST"
+queue = "forge-vault-ingest"
+
+[[queues.consumers]]
+queue = "forge-vault-ingest"
+max_batch_size = 5
+max_retries = 5
+retry_delay = 30
+
+# Secrets (wrangler secret put …), never in this file:
+#   VAULT_PASSWORD  dashboard login
+#   ADMIN_TOKEN     bearer token for /admin/* (used by scripts/load_vault.mjs)

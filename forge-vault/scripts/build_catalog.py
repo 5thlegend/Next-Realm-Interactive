@@ -89,7 +89,11 @@ def find_refs(obj, role=None, out=None):
 
 
 def main():
+    # byid/ holds completed jobs that sit in projects but that the history listing doesn't
+    # return (e.g. nano_banana_2_1), fetched one by one with show_generation_by_ids.
     history = load_pages("history/page-*.json")
+    seen = {g["id"] for g in history}
+    history += [g for g in load_pages("byid/page-*.json") if g["id"] not in seen]
     marketing = load_pages("marketing/page-*.json")
     uploads = []
     for kind in ("image", "video", "audio"):
@@ -230,7 +234,8 @@ def main():
             deduped.append(j)
 
     ids = [a["id"] for a in assets]
-    placed_ids = set(by_item)
+    # Failed and moderated jobs (failed, nsfw, ip_detected) have no output file to archive.
+    placed_ids = {p["item_id"] for p in placements if p.get("status", "completed") == "completed"}
     summary = {
         "built_at": datetime.now(timezone.utc).isoformat(),
         "assets": len(assets),

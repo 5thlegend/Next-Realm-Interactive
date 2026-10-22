@@ -23,6 +23,7 @@ unreleased creative, and this repository is public.
 | `catalog/raw/marketing/page-NNN.json` | Marketing Studio history, verbatim |
 | `catalog/raw/uploads/<type>-page-NNN.json` | Uploaded images, video, audio |
 | `catalog/raw/projects/*.jsonl` | Projects, folder tree, and asset placements |
+| `catalog/raw/byid/page-NNN.json` | Completed jobs placed in projects but missing from the history listing |
 | `catalog/out/assets.jsonl` | One normalized record per asset (prompt, params, refs, vault path) |
 | `catalog/out/ingest.jsonl` | One copy job per file: `{key, url, asset_id, role}` |
 | `catalog/out/projects.json` | Project → folder tree with vault paths |

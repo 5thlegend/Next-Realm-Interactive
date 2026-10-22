@@ -21,7 +21,7 @@ bucket_name = "forge-vault"
 binding = "DB"
 database_name = "forge-vault"
 # Replace with the id printed by: npx wrangler d1 create forge-vault
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "e1f7e770-c5d1-4b46-93b7-719aeb849675"
 migrations_dir = "migrations"
 
 [[queues.producers]]

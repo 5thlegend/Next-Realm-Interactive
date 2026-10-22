@@ -1,0 +1,17 @@
+{
+  "name": "forge-vault",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "migrate:local": "wrangler d1 migrations apply forge-vault --local",
+    "migrate:remote": "wrangler d1 migrations apply forge-vault --remote"
+  },
+  "dependencies": {
+    "client-zip": "2.5.1"
+  },
+  "devDependencies": {
+    "wrangler": "4.148.0"
+  }
+}

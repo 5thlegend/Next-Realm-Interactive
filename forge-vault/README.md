@@ -5,7 +5,7 @@ stored with the prompt, model, settings and reference media that produced it.
 
 ```
 Higgsfield ──(read-only MCP export)──▶ catalog/raw ──build_catalog.py──▶ catalog/out
-                                                                            │
+                                                                            │ load_vault.mjs
                                      Cloudflare Worker + Queue ◀────────────┘
                                          │  copies each file edge-side
                                          ▼
@@ -55,7 +55,59 @@ motion/style thumbnails) are kept in `params` but not copied.
 An asset placed in several projects lives under its earliest placement; `meta.json`
 lists every placement.
 
-## Stage 2 — Ingest + gallery (next)
+## Stage 2 — Vault Worker + dashboard (`worker/`)
 
-Needs a Cloudflare API token (Workers, R2, D1 edit) as `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID`, and `api.cloudflare.com` allowed in the session's network policy.
+One Worker does everything:
+
+| Route | What it does |
+|---|---|
+| `/` | Dashboard: search prompts, filter by type/model/project/collection, infinite grid, detail view |
+| `/api/*` | Stats, projects, models, asset list (cursor-paged), asset detail with refs + lineage |
+| `/api/assets/:id/prompt.txt`, `/meta.json` | Prompt and full metadata as downloads |
+| `/file/<vault key>` | Streams from R2 (range requests for video). Not copied yet → redirects to the Higgsfield original |
+| `/zip?<filters>` | Streams a ZIP of the current view: files, `prompt.txt`, `meta.json`, references (300 assets max) |
+| `/admin/*` | Bearer-token loader endpoints: `seed`, `enqueue`, `status`, `requeue-errors` |
+| queue consumer | Copies each file Higgsfield → R2, then writes `prompt.txt` + `meta.json` beside the asset |
+
+Storage: **R2** holds the files (the archive itself). **D1** holds the search index, projects and
+copy-job status. The dashboard works from the moment D1 is seeded; thumbnails switch from
+Higgsfield links to vault copies as the queue drains.
+
+Access: everything except `/login` and `/admin/*` requires the vault password (HMAC session
+cookie, 30 days). For a team, also put the workers.dev hostname behind **Cloudflare Access**
+(Zero Trust → Access → Applications), free up to 50 users.
+
+### Deploy
+
+Requires a Cloudflare API token with Workers Scripts, R2, D1 and Queues edit rights
+(`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`). Queues need the Workers Paid plan ($5/mo).
+
+```bash
+cd forge-vault/worker
+npm install
+npx wrangler r2 bucket create forge-vault
+npx wrangler d1 create forge-vault          # paste the printed database_id into wrangler.toml
+npx wrangler queues create forge-vault-ingest
+npm run migrate:remote
+npx wrangler secret put VAULT_PASSWORD
+npx wrangler secret put ADMIN_TOKEN
+npx wrangler deploy                          # prints https://forge-vault.<subdomain>.workers.dev
+
+cd ..
+VAULT_URL=https://forge-vault.<subdomain>.workers.dev ADMIN_TOKEN=... node scripts/load_vault.mjs --seed
+VAULT_URL=... ADMIN_TOKEN=... node scripts/load_vault.mjs --enqueue
+curl -H "authorization: Bearer $ADMIN_TOKEN" $VAULT_URL/admin/status
+```
+
+Both loader steps are idempotent. Re-export from Higgsfield, rebuild the catalog and re-run
+them to sync new work; files already in R2 are skipped.
+
+### Local development
+
+```bash
+cd forge-vault/worker
+printf 'VAULT_PASSWORD=local-test\nADMIN_TOKEN=local-admin\n' > .dev.vars
+npm run migrate:local
+npx wrangler dev
+VAULT_URL=http://127.0.0.1:8787 ADMIN_TOKEN=local-admin node ../scripts/load_vault.mjs --seed
+```

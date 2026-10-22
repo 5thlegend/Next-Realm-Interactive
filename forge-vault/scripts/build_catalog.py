@@ -33,14 +33,14 @@ UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 def load_pages(pattern):
     items = []
     for p in sorted(RAW.glob(pattern)):
-        items.extend(json.loads(p.read_text())["items"])
+        items.extend(json.loads(p.read_text(encoding="utf-8"))["items"])
     return items
 
 
 def load_jsonl(path):
     if not path.exists():
         return []
-    return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+    return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
 
 
 def slug(s, fallback="untitled"):
@@ -91,9 +91,12 @@ def find_refs(obj, role=None, out=None):
 def main():
     # byid/ holds completed jobs that sit in projects but that the history listing doesn't
     # return (e.g. nano_banana_2_1), fetched one by one with show_generation_by_ids.
-    history = load_pages("history/page-*.json")
-    seen = {g["id"] for g in history}
-    history += [g for g in load_pages("byid/page-*.json") if g["id"] not in seen]
+    # History is exported in parallel time windows (page-w1-*, page-w2-*...); drop boundary overlaps.
+    history, seen = [], set()
+    for g in load_pages("history/page-*.json") + load_pages("byid/page-*.json"):
+        if g["id"] not in seen:
+            seen.add(g["id"])
+            history.append(g)
     marketing = load_pages("marketing/page-*.json")
     uploads = []
     for kind in ("image", "video", "audio"):
@@ -103,7 +106,8 @@ def main():
 
     projects = {p["project_id"]: p for p in load_jsonl(RAW / "projects/projects.jsonl")}
     folders = {f["folder_id"]: f for f in load_jsonl(RAW / "projects/folders.jsonl")}
-    placements = load_jsonl(RAW / "projects/placements.jsonl")
+    # Placements may be split across files (placements-a.jsonl, placements-b.jsonl, ...).
+    placements = [pl for f in sorted((RAW / "projects").glob("placements*.jsonl")) for pl in load_jsonl(f)]
 
     # Folder id -> vault path ("skunk-inc-videos/koi-video").
     def folder_path(folder_id, project_id):
@@ -268,13 +272,13 @@ def main():
         })
 
     OUT.mkdir(parents=True, exist_ok=True)
-    with open(OUT / "assets.jsonl", "w") as fh:
+    with open(OUT / "assets.jsonl", "w", encoding="utf-8") as fh:
         for a in assets:
             fh.write(json.dumps(a, ensure_ascii=False) + "\n")
-    with open(OUT / "ingest.jsonl", "w") as fh:
+    with open(OUT / "ingest.jsonl", "w", encoding="utf-8") as fh:
         for j in deduped:
             fh.write(json.dumps(j) + "\n")
-    (OUT / "projects.json").write_text(json.dumps(tree, indent=2, ensure_ascii=False))
+    (OUT / "projects.json").write_text(json.dumps(tree, indent=2, ensure_ascii=False), encoding="utf-8")
     (OUT / "summary.json").write_text(json.dumps(summary, indent=2))
     json.dump(summary, sys.stdout, indent=2)
     print()

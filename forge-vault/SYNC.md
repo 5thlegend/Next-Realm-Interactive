@@ -44,12 +44,16 @@ Replace `{date}` with today's date as `YYYYMMDD`, and leave `{n}` literally as w
 2. For new projects, walk the folders with `list_folders` and append them to `folders.jsonl` as
    `{"folder_id","name","parent_folder_id","project_id"}`. A top-level folder's parent is the
    project's `default_folder_id`.
-3. For every project, call
-   `list_project_assets {workspace_id, project_id, size:50, order_by:"added_at", ordering:"desc"}`.
-   Stop paging a project as soon as a page contains a `placement_id` that is in
-   `catalog/state/known-placements.txt`. Append each new placement to
+3. For every project, probe the newest placement first:
+   `list_project_assets {workspace_id, project_id, size:1, order_by:"added_at", ordering:"desc"}`.
+   If its `placement_id` is in `catalog/state/known-placements.txt`, the project has nothing new,
+   so skip it. Most projects end here. Otherwise, page the same call with `size:50` and stop as soon
+   as a page contains a known `placement_id`. Append each new placement to
    `catalog/raw/projects/placements-sync.jsonl` as
    `{"item_id","project_id","folder_id","placement_id","added_at","status","source_type"}`.
+   A project with no placements at all returns an empty page, so skip it.
+
+If nothing new turned up in steps 2 and 3, skip step 4 and just report "no changes".
 
 ## 4. Publish
 
